@@ -16,6 +16,9 @@ def login():
     if flask.request.headers.get(app.config['PROXY_AUTH_HEADER']) and not 'noproxyauth' in flask.request.url:
         return _proxy()
 
+    if app.config['OIDC_ENABLED'] and not 'nooidcauth' in flask.request.url:
+        return _oidc()
+
     client_ip = flask.request.headers.get('X-Real-IP', flask.request.remote_addr)
     client_port = flask.request.headers.get('X-Real-Port', None)
     form = forms.LoginForm()
@@ -140,7 +143,12 @@ def _proxy():
         flask.current_app.logger.error(f'Login failed by proxy - no header: from {client_ip} through {flask.request.remote_addr}.')
         return flask.abort(500, 'No %s header' % app.config['PROXY_AUTH_HEADER'])
 
-    url = _has_usable_redirect(True) or app.config['WEB_ADMIN']
+    return _extauth_authenticated(email)
+
+def _extauth_authenticated(email, url=None):
+    client_ip = flask.request.headers.get('X-Real-IP', flask.request.remote_addr)
+    if url is None:
+        url = _has_usable_redirect(True) or app.config['WEB_ADMIN']
 
     user = models.User.get(email)
     if user:
@@ -153,7 +161,6 @@ def _proxy():
         flask.current_app.logger.warning(f'Login failed by proxy - does not exist: {user} from {client_ip} through {flask.request.remote_addr}.')
         return flask.abort(500, 'You don\'t exist. Go away! (%s)' % email)
 
-    client_ip = flask.request.headers.get('X-Real-IP', flask.request.remote_addr)
     try:
         localpart, desireddomain = email.rsplit('@')
     except Exception as e:
@@ -172,3 +179,14 @@ def _proxy():
     user.send_welcome()
     flask.current_app.logger.info(f'Login succeeded by proxy created user: {user} from {client_ip} through {flask.request.remote_addr}.')
     return flask.redirect(url)
+
+def _oidc():
+    if 'code' in flask.request.args:
+        token = app.oauth.oidc.authorize_access_token()
+        userinfo = token['userinfo']
+        email = userinfo.email
+        return _extauth_authenticated(email, flask.session.pop('oidc_continue', None))
+    else:
+        if destination := _has_usable_redirect():
+            flask.session['oidc_continue'] = destination
+        return app.oauth.oidc.authorize_redirect(flask.url_for('sso.login', _external=True))
