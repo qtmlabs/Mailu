@@ -89,4 +89,5 @@ ENV \
   ANTIVIRUS_ADDRESS="antivirus" \
   ANTISPAM_ADDRESS="antispam" \
   WEBMAIL_ADDRESS="webmail" \
-  WEBDAV_ADDRESS="webdav"
+  WEBDAV_ADDRESS="webdav" \
+  XAPSD_ADDRESS="xapsd"

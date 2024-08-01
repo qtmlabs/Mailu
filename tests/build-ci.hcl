@@ -52,7 +52,8 @@ group "default" {
     "fetchmail",
     "resolver",
     "traefik-certdumper",
-    "webdav"
+    "webdav",
+    "xapsd"
   ]
 }
 
@@ -237,4 +238,13 @@ target "webdav" {
     base = "docker-image://${DOCKER_ORG}/base:${MAILU_VERSION}"
   }
   tags = tag("radicale")
+}
+
+target "xapsd" {
+  inherits = ["defaults"]
+  context = "optional/xapsd/"
+  contexts = {
+    base = "docker-image://${DOCKER_ORG}/base:${MAILU_VERSION}"
+  }
+  tags = tag("xapsd")
 }
