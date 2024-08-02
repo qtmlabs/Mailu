@@ -9,7 +9,7 @@ import flask
 import flask_login
 import secrets
 import ipaddress
-from urllib.parse import urlparse, urljoin, unquote
+from urllib.parse import urlencode, urlparse, urljoin, unquote
 
 @sso.route('/login', methods=['GET', 'POST'])
 def login():
@@ -110,9 +110,10 @@ def pw_change():
 @sso.route('/logout', methods=['GET'])
 @access.authenticated
 def logout():
+    redirect_url = flask.session.pop('logout_redirect', None) or app.config['PROXY_AUTH_LOGOUT_URL'] or flask.url_for('.login')
     flask_login.logout_user()
     flask.session.destroy()
-    response = flask.redirect(app.config['PROXY_AUTH_LOGOUT_URL'] or flask.url_for('.login'))
+    response = flask.redirect(redirect_url)
     for cookie in ['roundcube_sessauth', 'roundcube_sessid', 'smsession']:
         response.set_cookie(cookie, 'empty', expires=0)
     return response
@@ -189,6 +190,13 @@ def _oidc():
         token = oidc.authorize_access_token()
         if app.config['OIDC_REQUIRED']:
             flask.session['refresh_token'] = token['refresh_token']
+        metadata = oidc.load_server_metadata()
+        if end_session_endpoint := metadata.get('end_session_endpoint'):
+            query_string = urlencode({
+                'id_token_hint': token['id_token'],
+                'post_logout_redirect_uri': flask.url_for('sso.login', _external=True),
+            })
+            flask.session['logout_redirect'] = f'{end_session_endpoint}?{query_string}'
         userinfo = token['userinfo']
         email = userinfo.email
         return _extauth_authenticated(email, flask.session.pop('oidc_continue', None))

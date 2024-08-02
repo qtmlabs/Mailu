@@ -29,6 +29,7 @@ import flask_babel
 import ipaddress
 import redis
 
+from authlib.integrations.flask_client import OAuthError
 from datetime import datetime, timedelta
 from flask.sessions import SessionMixin, SessionInterface
 from itsdangerous.encoding import want_bytes
