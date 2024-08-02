@@ -201,6 +201,6 @@ def _oidc():
         email = userinfo.email
         return _extauth_authenticated(email, flask.session.pop('oidc_continue', None))
     else:
-        if destination := _has_usable_redirect():
+        if destination := _has_usable_redirect(True):
             flask.session['oidc_continue'] = destination
         return oidc.authorize_redirect(flask.url_for('sso.login', _external=True))
