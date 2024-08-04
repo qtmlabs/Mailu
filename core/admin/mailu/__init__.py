@@ -59,7 +59,7 @@ def create_app_from_config(config):
         app.oauth.register(
             'oidc',
             server_metadata_url=app.config['OIDC_ISSUER'] + '/.well-known/openid-configuration',
-            client_kwargs={'scope': 'openid profile email'}
+            client_kwargs={'scope': 'openid email'}
         )
 
     app.device_cookie_key = hmac.new(bytearray(app.secret_key, 'utf-8'), bytearray('DEVICE_COOKIE_KEY', 'utf-8'), 'sha256').digest()
