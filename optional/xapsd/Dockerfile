@@ -1,15 +1,14 @@
-# syntax=docker/dockerfile-upstream:1.4.3
+# syntax=docker/dockerfile-upstream:1.9.0
 
 # apple push gateway image
 FROM docker.io/library/golang:1.19.7-alpine AS build
 
-RUN apk add --no-cache git
+ARG xapsd_repo=https://github.com/qtmlabs/dovecot-xaps-daemon.git
+ARG xapsd_revision=8d0358a83cccd3a43232a334dee682b54f1234f4
 
-RUN git clone https://github.com/freswa/dovecot-xaps-daemon.git /build
+ADD ${xapsd_repo}#${xapsd_revision} /build
 
 WORKDIR /build
-
-RUN git checkout abce2f14cf1b5afa56329ebb4d923c9c2aebdfe3
 
 RUN go build -o ./ ./cmd/xapsd/
 
