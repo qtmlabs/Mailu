@@ -4,6 +4,7 @@ libs/socrate
 
 # core/admin
 alembic
+Authlib
 Babel
 bcrypt
 click

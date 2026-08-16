@@ -71,6 +71,11 @@ DEFAULT_CONFIG = {
     'RECAPTCHA_PRIVATE_KEY': '',
     'LOGO_URL': None,
     'LOGO_BACKGROUND': None,
+    # OIDC settings
+    'OIDC_ENABLED': False,
+    'OIDC_ISSUER': None,
+    'OIDC_CLIENT_ID': None,
+    'OIDC_CLIENT_SECRET': None,
     # Advanced settings
     'AUTH_REQUIRE_TOKENS': False,
     'API': False,
