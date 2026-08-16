@@ -30,6 +30,9 @@ import ipaddress
 import redis
 
 from authlib.integrations.flask_client import OAuthError
+from authlib.oidc.core import IDToken
+from authlib.jose import jwt, JsonWebToken, JsonWebKey
+from authlib.jose.errors import InvalidClaimError
 from datetime import datetime, timedelta
 from flask.sessions import SessionMixin, SessionInterface
 from itsdangerous.encoding import want_bytes
@@ -215,21 +218,25 @@ class MailuSession(CallbackDict, SessionMixin):
                 (self._uid, self._sid, self._created) = parsed
                 self._key = key
 
-        if initial is not None and 'refresh_token' in initial:
+        if initial is not None and 'oidc_refresh_token' in initial \
+           and initial['oidc_next_refresh'] < time.time():
             try:
                 oidc = self.app.oauth.oidc
                 metadata = oidc.load_server_metadata()
                 with oidc._get_oauth_client(**metadata) as client:
                     token = client.refresh_token(
                         url=metadata['token_endpoint'],
-                        refresh_token=initial['refresh_token'],
+                        refresh_token=initial['oidc_refresh_token'],
                     )
-                    if 'refresh_token' in token:
-                        initial['refresh_token'] = token['refresh_token']
-                        self.app.session_store.put(key, pickle.dumps(initial))
+                    initial['oidc_next_refresh'] = token['expires_at']
+                    if new_refresh_token := token.get('refresh_token'):
+                        initial['oidc_refresh_token'] = new_refresh_token
+                    self.app.session_store.put(key, pickle.dumps(initial))
             except OAuthError:
                 if 'webmail_token' in initial:
                     self.app.session_store.delete(initial['webmail_token'])
+                if 'oidc_session' in initial:
+                    self.app.session_store.delete(initial['oidc_session'])
                 self.app.session_store.delete(key)
                 initial = None
 
@@ -280,8 +287,11 @@ class MailuSession(CallbackDict, SessionMixin):
     def delete(self, clear_token=True):
         """ Delete stored session. """
         if self.saved:
-            if clear_token and 'webmail_token' in self:
-                self.app.session_store.delete(self['webmail_token'])
+            if clear_token:
+                if 'webmail_token' in self:
+                    self.app.session_store.delete(self['webmail_token'])
+                if 'oidc_session' in self:
+                    self.app.session_store.delete(self['oidc_session'])
             self.app.session_store.delete(self._key)
             self._key = None
 
@@ -298,6 +308,11 @@ class MailuSession(CallbackDict, SessionMixin):
             set_cookie = True
             if 'webmail_token' in self:
                 self.app.session_store.put(self['webmail_token'],
+                        self.sid,
+                        self.app.config['PERMANENT_SESSION_LIFETIME'],
+                )
+            if 'oidc_session' in self:
+                self.app.session_store.put(self['oidc_session'],
                         self.sid,
                         self.app.config['PERMANENT_SESSION_LIFETIME'],
                 )
@@ -515,6 +530,51 @@ class MailuSessionExtension:
                         cleaned.value = True
                         app.logger.info('cleaning session store')
                         MailuSessionExtension.cleanup_sessions(app)
+
+class LogoutToken(IDToken):
+    ESSENTIAL_CLAIMS = ['iss', 'sub', 'aud', 'exp', 'iat', 'events']
+    REGISTERED_CLAIMS = ['sid']
+
+    def validate(self, *args, **kwargs):
+        super().validate(*args, **kwargs)
+
+        self.validate_events()
+
+    def validate_nonce(self):
+        if 'nonce' in self:
+            raise InvalidClaimError('nonce')
+
+    def validate_events(self):
+        if 'http://schemas.openid.net/event/backchannel-logout' not in self['events']:
+            raise InvalidClaimError('events')
+
+def parse_logout_token(logout_token):
+    oidc = app.oauth.oidc
+    def load_key(header, _):
+        jwk_set = JsonWebKey.import_key_set(oidc.fetch_jwk_set())
+        try:
+            return jwk_set.find_by_kid(header.get('kid'))
+        except ValueError:
+            # re-try with new jwk set
+            jwk_set = JsonWebKey.import_key_set(oidc.fetch_jwk_set(force=True))
+            return jwk_set.find_by_kid(header.get('kid'))
+    metadata = oidc.load_server_metadata()
+    claims_options = None
+    if 'issuer' in metadata:
+        claims_options = {'iss': {'values': [metadata['issuer']]}}
+    if alg_values := metadata.get('id_token_signing_alg_values_supported'):
+        _jwt = JsonWebToken(alg_values)
+    else:
+        _jwt = jwt
+    claims = _jwt.decode(
+        logout_token,
+        key=load_key,
+        claims_cls=LogoutToken,
+        claims_options=claims_options,
+        claims_params={'client_id': app.config['OIDC_CLIENT_ID']},
+    )
+    claims.validate()
+    return claims
 
 cleaned = Value('i', False)
 session = MailuSessionExtension()
