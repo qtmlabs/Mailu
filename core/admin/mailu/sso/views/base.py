@@ -112,8 +112,7 @@ def logout():
     redirect_url = flask.session.pop('logout_redirect', None) or app.config['PROXY_AUTH_LOGOUT_URL'] or flask.url_for('.login')
     flask_login.logout_user()
     flask.session.destroy()
-    response = flask.redirect(redirect_url)
-    return _clear_webmail_cookies(response)
+    return _clear_webmail_cookies(flask.redirect(redirect_url))
 
 """
 Drop any webmail session left over from a previous login: its credentials
@@ -205,7 +204,10 @@ def _oidc():
             flask.session['logout_redirect'] = f'{end_session_endpoint}?{query_string}'
         userinfo = token['userinfo']
         email = userinfo.email
-        return _extauth_authenticated(email, flask.session.pop('oidc_continue', None))
+        response = _extauth_authenticated(email, flask.session.pop('oidc_continue', None))
+        if app.config['OIDC_REQUIRED']:
+            _clear_webmail_cookies(response)
+        return response
     else:
         if destination := _has_usable_redirect(True):
             flask.session['oidc_continue'] = destination
