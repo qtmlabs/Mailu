@@ -48,7 +48,8 @@ group "default" {
     "fetchmail",
     "resolver",
     "traefik-certdumper",
-    "webdav"
+    "webdav",
+    "xapsd"
   ]
 }
 
@@ -231,4 +232,13 @@ target "webdav" {
     base = "target:base"
   }
   tags = tag("radicale")
+}
+
+target "xapsd" {
+  inherits = ["defaults"]
+  context = "optional/xapsd/"
+  contexts = {
+    base = "target:base"
+  }
+  tags = tag("xapsd")
 }
