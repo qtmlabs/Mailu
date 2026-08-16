@@ -1,4 +1,4 @@
-# syntax=docker/dockerfile-upstream:1.4.3
+# syntax=docker/dockerfile-upstream:1.9.0
 
 # dovecot image
 FROM base AS system
@@ -12,13 +12,14 @@ RUN set -euxo pipefail \
 
 FROM system AS build
 
-RUN apk add --no-cache build-base ninja cmake dovecot-dev git
+ARG xaps_plugin_repo=https://github.com/qtmlabs/dovecot-xaps-plugin.git
+ARG xaps_plugin_revision=29a2538b6ae407498e47ac75ffee9198572e8471
 
-RUN git clone https://github.com/qtmlabs/dovecot-xaps-plugin /build
+RUN apk add --no-cache build-base ninja cmake dovecot-dev
+
+ADD ${xaps_plugin_repo}#${xaps_plugin_revision} /build
 
 WORKDIR /build
-
-RUN git checkout 29a2538b6ae407498e47ac75ffee9198572e8471
 
 RUN set -euxo pipefail \
   ; cmake -G Ninja -B build -D CMAKE_BUILD_TYPE=Release \
