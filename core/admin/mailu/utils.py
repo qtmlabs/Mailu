@@ -213,6 +213,24 @@ class MailuSession(CallbackDict, SessionMixin):
                 (self._uid, self._sid, self._created) = parsed
                 self._key = key
 
+        if initial is not None and 'refresh_token' in initial:
+            try:
+                oidc = self.app.oauth.oidc
+                metadata = oidc.load_server_metadata()
+                with oidc._get_oauth_client(**metadata) as client:
+                    token = client.refresh_token(
+                        url=metadata['token_endpoint'],
+                        refresh_token=initial['refresh_token'],
+                    )
+                    if 'refresh_token' in token:
+                        initial['refresh_token'] = token['refresh_token']
+                        self.app.session_store.put(key, pickle.dumps(initial))
+            except OAuthError:
+                if 'webmail_token' in initial:
+                    self.app.session_store.delete(initial['webmail_token'])
+                self.app.session_store.delete(key)
+                initial = None
+
         if initial is None:
             # start new session
             self.new = True
