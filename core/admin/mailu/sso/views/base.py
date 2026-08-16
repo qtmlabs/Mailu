@@ -184,12 +184,15 @@ def _extauth_authenticated(email, url=None):
     return flask.redirect(url)
 
 def _oidc():
+    oidc = app.oauth.oidc
     if 'code' in flask.request.args:
-        token = app.oauth.oidc.authorize_access_token()
+        token = oidc.authorize_access_token()
+        if app.config['OIDC_REQUIRED']:
+            flask.session['refresh_token'] = token['refresh_token']
         userinfo = token['userinfo']
         email = userinfo.email
         return _extauth_authenticated(email, flask.session.pop('oidc_continue', None))
     else:
         if destination := _has_usable_redirect():
             flask.session['oidc_continue'] = destination
-        return app.oauth.oidc.authorize_redirect(flask.url_for('sso.login', _external=True))
+        return oidc.authorize_redirect(flask.url_for('sso.login', _external=True))
