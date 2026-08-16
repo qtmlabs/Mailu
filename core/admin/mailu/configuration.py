@@ -73,6 +73,7 @@ DEFAULT_CONFIG = {
     'LOGO_BACKGROUND': None,
     # OIDC settings
     'OIDC_ENABLED': False,
+    'OIDC_REQUIRED': False,
     'OIDC_ISSUER': None,
     'OIDC_CLIENT_ID': None,
     'OIDC_CLIENT_SECRET': None,
