@@ -196,7 +196,7 @@ def _oidc():
         if end_session_endpoint := metadata.get('end_session_endpoint'):
             query_string = urlencode({
                 'id_token_hint': token['id_token'],
-                'post_logout_redirect_uri': flask.url_for('sso.login', _external=True),
+                'post_logout_redirect_uri': flask.request.host_url,
             })
             flask.session['logout_redirect'] = f'{end_session_endpoint}?{query_string}'
         userinfo = token['userinfo']
