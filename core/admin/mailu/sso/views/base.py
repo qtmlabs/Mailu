@@ -13,6 +13,9 @@ from urllib.parse import urlparse, urljoin, unquote
 
 @sso.route('/login', methods=['GET', 'POST'])
 def login():
+    if app.config['OIDC_REQUIRED']:
+        return _oidc()
+
     if flask.request.headers.get(app.config['PROXY_AUTH_HEADER']) and not 'noproxyauth' in flask.request.url:
         return _proxy()
 
