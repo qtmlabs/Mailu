@@ -5,6 +5,7 @@ FROM node:21-alpine3.18
 WORKDIR /work
 
 COPY package.json ./
+COPY package-lock.json ./
 
 RUN set -euxo pipefail \
   ; npm config set update-notifier false \
