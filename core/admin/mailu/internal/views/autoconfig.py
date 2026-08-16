@@ -1,9 +1,17 @@
+from mailu import models
 from mailu.internal import internal
+from mailu.ui import access
+
+from datetime import datetime
+from passlib import pwd
+import uuid
 
 from xml.etree import ElementTree as ET
 from xml.sax.saxutils import escape, quoteattr
 from flask import current_app as app
+from flask_babel import format_datetime
 import flask
+import flask_login
 
 @internal.route("/autoconfig/mozilla")
 def autoconfig_mozilla():
@@ -120,10 +128,24 @@ def autoconfig_microsoft():
         return flask.abort(400)
 
 @internal.route("/autoconfig/apple")
+@access.authenticated
 def autoconfig_apple():
     # https://developer.apple.com/business/documentation/Configuration-Profile-Reference.pdf
     hostname = app.config['HOSTNAME']
     sitename = app.config['SITENAME']
+
+    user = flask_login.current_user
+    profile_uuid = uuid.uuid4()
+    client_ip = flask.request.headers.get('X-Real-IP', flask.request.remote_addr)
+    formatted_datetime = format_datetime(datetime.now())
+    password = pwd.genword(entropy=128, length=32, charset="hex")
+
+    token = models.Token(user=user)
+    token.set_password(password)
+    token.comment = f'Apple Device (Profile UUID: {profile_uuid}) created by {flask.request.user_agent.string} from {client_ip} at {formatted_datetime}'
+    models.db.session.add(token)
+    models.db.session.commit()
+
     xml = f'''<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
 "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -139,7 +161,7 @@ def autoconfig_apple():
 <key>EmailAccountType</key>
 <string>EmailTypeIMAP</string>
 <key>EmailAddress</key>
-<string></string>
+<string>{user.email}</string>
 <key>IncomingMailServerAuthentication</key>
 <string>EmailAuthPassword</string>
 <key>IncomingMailServerHostName</key>
@@ -149,9 +171,9 @@ def autoconfig_apple():
 <key>IncomingMailServerUseSSL</key>
 <true/>
 <key>IncomingMailServerUsername</key>
-<string></string>
+<string>{user.email}</string>
 <key>IncomingPassword</key>
-<string></string>
+<string>{password}</string>
 <key>OutgoingMailServerAuthentication</key>
 <string>EmailAuthPassword</string>
 <key>OutgoingMailServerHostName</key>
@@ -161,21 +183,21 @@ def autoconfig_apple():
 <key>OutgoingMailServerUseSSL</key>
 <true/>
 <key>OutgoingMailServerUsername</key>
-<string></string>
-<key>OutgoingPasswordSameAsIncomingPassword</key>
-<true/>
+<string>{user.email}</string>
+<key>OutgoingPassword</key>
+<string>{password}</string>
 <key>PayloadDescription</key>
 <string>{sitename}</string>
 <key>PayloadDisplayName</key>
 <string>{hostname}</string>
 <key>PayloadIdentifier</key>
-<string>{hostname}.email</string>
+<string>io.mailu.email.{profile_uuid}</string>
 <key>PayloadOrganization</key>
 <string></string>
 <key>PayloadType</key>
 <string>com.apple.mail.managed</string>
 <key>PayloadUUID</key>
-<string>72e152e2-d285-4588-9741-25bdd50c4d11</string>
+<string>{profile_uuid}</string>
 <key>PayloadVersion</key>
 <integer>1</integer>
 <key>PreventAppSheet</key>
@@ -189,11 +211,11 @@ def autoconfig_apple():
 </dict>
 </array>
 <key>PayloadDescription</key>
-<string>{hostname} - E-Mail Account Configuration</string>
+<string>{user.email} - E-Mail Account Configuration (Profile UUID: {profile_uuid})</string>
 <key>PayloadDisplayName</key>
-<string>E-Mail Account {hostname}</string>
+<string>E-Mail Account {user.email}</string>
 <key>PayloadIdentifier</key>
-<string>E-Mail Account {hostname}</string>
+<string>io.mailu.email.{profile_uuid}</string>
 <key>PayloadOrganization</key>
 <string>{hostname}</string>
 <key>PayloadRemovalDisallowed</key>
@@ -201,7 +223,7 @@ def autoconfig_apple():
 <key>PayloadType</key>
 <string>Configuration</string>
 <key>PayloadUUID</key>
-<string>56db43a5-d29e-4609-a908-dce94d0be48e</string>
+<string>{profile_uuid}</string>
 <key>PayloadVersion</key>
 <integer>1</integer>
 </dict>
