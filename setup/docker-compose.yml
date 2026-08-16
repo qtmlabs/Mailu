@@ -7,9 +7,9 @@ services:
     image: redis:alpine
 
   setup:
-    image: ${DOCKER_ORG:-mailu}/setup:${MAILU_VERSION:-master}
+    image: ${DOCKER_ORG:-localhost/mailu}/setup:${MAILU_VERSION:-local}
     env_file: .env
     depends_on:
       - redis
     ports:
-      - 127.0.0.1:8001:80
+      - 127.0.0.1:8001:8001
