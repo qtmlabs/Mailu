@@ -115,6 +115,36 @@ def logout():
     flask.session.destroy()
     return _clear_webmail_cookies(flask.redirect(redirect_url))
 
+@sso.route('/oidc/revoke', methods=['POST'])
+def oidc_revoke():
+    if not app.config['OIDC_ENABLED']:
+        return {
+            'error': 'invalid_request',
+            'error_description': 'OpenID Connect is disabled',
+        }, 400
+    logout_token = flask.request.form.get('logout_token')
+    if logout_token is None:
+        return {
+            'error': 'invalid_request',
+            'error_description': 'Logout token not provided',
+        }, 400
+    try:
+        claims = utils.parse_logout_token(logout_token)
+    except Exception:
+        return {
+            'error': 'invalid_request',
+            'error_description': 'Failed to validate logout token',
+        }, 400
+    try:
+        sessid = app.session_store.get('oidc-session:' + claims.sid)
+    except KeyError:
+        return {
+            'error': 'invalid_grant',
+            'error_description': 'Session not found',
+        }, 400
+    utils.MailuSession(sessid, app).destroy()
+    return {}, 200
+
 def _clear_webmail_cookies(response):
     for cookie in ['roundcube_sessauth', 'roundcube_sessid', 'smsession']:
         response.set_cookie(cookie, 'empty', expires=0)
@@ -190,8 +220,7 @@ def _oidc():
     oidc = app.oauth.oidc
     if 'code' in flask.request.args:
         token = oidc.authorize_access_token()
-        if app.config['OIDC_REQUIRED']:
-            flask.session['refresh_token'] = token['refresh_token']
+        id_claims = token['userinfo']
         metadata = oidc.load_server_metadata()
         if end_session_endpoint := metadata.get('end_session_endpoint'):
             query_string = urlencode({
@@ -199,11 +228,14 @@ def _oidc():
                 'post_logout_redirect_uri': flask.request.host_url,
             })
             flask.session['logout_redirect'] = f'{end_session_endpoint}?{query_string}'
-        userinfo = token['userinfo']
-        email = userinfo.email
-        response = _extauth_authenticated(email, flask.session.pop('oidc_continue', None))
-        if app.config['OIDC_REQUIRED']:
-            _clear_webmail_cookies(response)
+        response = _extauth_authenticated(
+            id_claims.email,
+            flask.session.pop('oidc_continue', None),
+        )
+        _clear_webmail_cookies(response)
+        flask.session['oidc_session'] = 'oidc-session:' + id_claims['sid']
+        flask.session['oidc_refresh_token'] = token['refresh_token']
+        flask.session['oidc_next_refresh'] = token['expires_at']
         return response
     else:
         if destination := _has_usable_redirect(True):
