@@ -17,9 +17,10 @@ import flask_login
 def autoconfig_mozilla():
     # https://wiki.mozilla.org/Thunderbird:Autoconfiguration:ConfigFileFormat
     hostname = app.config['HOSTNAME']
+    domain = app.config['DOMAIN']
     xml = f'''<?xml version="1.0"?>
 <clientConfig version="1.1">
-<emailProvider id="{hostname}">
+<emailProvider id="{domain}">
 <domain>%EMAILDOMAIN%</domain>
 
 <displayName>Email</displayName>
