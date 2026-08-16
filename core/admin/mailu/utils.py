@@ -13,6 +13,8 @@ import dns.rdtypes
 import dns.rdatatype
 import dns.rdataclass
 
+import base64
+import binascii
 import hmac
 import secrets
 import string
@@ -410,12 +412,12 @@ class MailuSessionConfig:
         return (uid, sid, crt)
 
     def _encode(self, value):
-        return secrets.base64.urlsafe_b64encode(value).rstrip(b'=')
+        return base64.urlsafe_b64encode(value).rstrip(b'=')
 
     def _decode(self, value):
         try:
-            return secrets.base64.urlsafe_b64decode(value + b'='*(4-len(value)%4))
-        except secrets.binascii.Error:
+            return base64.urlsafe_b64decode(value + b'='*(4-len(value)%4))
+        except binascii.Error:
             return None
 
 class MailuSessionInterface(SessionInterface):
