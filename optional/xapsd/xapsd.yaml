@@ -1,0 +1,8 @@
+loglevel: info
+databaseFile: /var/lib/xapsd/database.json
+listenAddr: '[::]'
+port: 11619
+checkInterval: 20
+delay: 30
+appleId: {{ XAPSD_APPLE_ID }}
+appleIdHashedPassword: {{ XAPSD_APPLE_ID_HASHED_PASSWORD }}
