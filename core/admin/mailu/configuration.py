@@ -36,6 +36,7 @@ DEFAULT_CONFIG = {
     'SECRET_KEY': 'changeMe',
     'DOMAIN': 'mailu.io',
     'HOSTNAMES': 'mail.mailu.io,alternative.mailu.io,yetanother.mailu.io',
+    'FRIENDLY_HOSTNAME': None,
     'POSTMASTER': 'postmaster',
     'WILDCARD_SENDERS': '',
     'TLS_FLAVOR': 'cert',
@@ -168,6 +169,8 @@ class ConfigManager:
         hostnames = [host.strip() for host in self.config['HOSTNAMES'].split(',')]
         self.config['HOSTNAMES'] = ','.join(hostnames)
         self.config['HOSTNAME'] = hostnames[0]
+        if self.config['FRIENDLY_HOSTNAME']:
+            self.config['HOSTNAME'] = self.config['FRIENDLY_HOSTNAME']
         self.config['DEFAULT_SPAM_THRESHOLD'] = int(self.config['DEFAULT_SPAM_THRESHOLD'])
         self.config['PROXY_AUTH_WHITELIST'] = set(ipaddress.ip_network(cidr, False) for cidr in (cidr.strip() for cidr in self.config['PROXY_AUTH_WHITELIST'].split(',')) if cidr)
         try:
